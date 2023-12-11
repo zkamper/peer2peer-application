@@ -83,7 +83,9 @@ int getFiles(char* path, vector<File> &files){
         }
         file.size = file_stats.st_size;
         char command[600];
-        sprintf(command,"sha256sum %s",file_path);
+        strcpy(command,"sha256sum \"");
+        strcat(command,file_path);
+        strcat(command,"\"");
         FILE* fp = popen(command,"r");
         if(fp == nullptr){
             printError("error while getting file hash");
