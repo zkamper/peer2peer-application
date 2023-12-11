@@ -11,6 +11,8 @@ void *handlePeer(void *arg){
     // Handle Request
     read(peer_fd,&request,sizeof(request));
     int peers_count = peers.size();
+    int files_count;
+    unordered_map<string,File> files;
     switch(request){
         case T_ONLINE:
             sockaddr_in peer_addr;
@@ -26,7 +28,7 @@ void *handlePeer(void *arg){
             cout<<TRACKER<<"Peer connected at "<<getAddressReadable(peer_addr)<<endl;
             break;
         case T_GETPEERS:
-            cout << TRACKER << "Peers request from [ " << getAddressReadable(peer_addr) << " ]" << endl;
+            cout << TRACKER << "Peers request from " << getAddressReadable(peer_addr) << endl;
             if(write(peer_fd,&peers_count,sizeof(peers_count)) < 0){
                 printError("error while writing to peer");
                 return nullptr;
@@ -50,6 +52,54 @@ void *handlePeer(void *arg){
                     break;
                 }
             }
+            break;
+        case T_GETFILES:
+            cout<<TRACKER<<"Files request from "<<getAddressReadable(peer_addr)<<endl;
+            for(int i = 0; i < peers_count; i++){
+                int other_peer = socket(AF_INET,SOCK_STREAM,0);
+                if(other_peer < 0){
+                    printError("socket error");
+                    return nullptr;
+                }
+                if(connect(other_peer,(struct sockaddr*)&peers[i],sizeof(peers[i])) < 0){
+                    printError("couldn't connect to peer to request files");
+                    return nullptr;
+                }
+                request = T_GETFILES;
+                // Trimitem request-ul
+                if( write(other_peer,&request,sizeof(request)) < 0){
+                    printError("error while writing to peer");
+                    return nullptr;
+                }
+                // Primim nr + proprietatile fisierelor
+                if( read(other_peer,&files_count,sizeof(files_count)) < 0){
+                    printError("error while reading from peer");
+                    return nullptr;
+                }
+                for(int i = 0; i < files_count; i++){
+                    File file;
+                    memset(&file,0,sizeof(file));
+                    if( read(other_peer,&file,sizeof(file)) < 0){
+                        printError("error while reading from peer");
+                        return nullptr;
+                    }
+                    files[file.hash] = file;
+                }
+                close(other_peer);
+            }
+            // Trimitem nr + proprietatile fisierelor
+            files_count = files.size();
+            if( write(peer_fd,&files_count,sizeof(files_count)) < 0){
+                printError("error while writing to peer file count");
+                return nullptr;
+            }
+            for(auto it = files.begin(); it != files.end(); it++){
+                if( write(peer_fd,&it->second,sizeof(it->second)) < 0){
+                    printError("error while writing to peer file data");
+                    return nullptr;
+                }
+            }
+            break;
         default:
             break;
     }

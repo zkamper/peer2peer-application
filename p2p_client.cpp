@@ -3,6 +3,7 @@
 int sock_fd,tracker_fd;
 sockaddr_in server_addr;
 pid_t pid;
+Options options;
 
 void handle_sig(int sig){
     cout << endl << "Exiting..." << endl;
@@ -15,10 +16,22 @@ void handle_sig(int sig){
     exit(0);
 }
 
+void initOptions(){
+    strcpy(options.files_path,"./downloads");
+    if(opendir(options.files_path) == nullptr){
+        mkdir(options.files_path,0777);
+    }
+    else{
+        closedir(opendir(options.files_path));
+    }
+}
+
 int main()
 {
     // Init phase - initializam peer-ul + conexiunea la tracker
     
+    initOptions();
+
     if (bindSocket(sock_fd, server_addr) < 0)
     {
         char err_msg[256];
@@ -84,6 +97,8 @@ int main()
             Requests ping;
             sockaddr_in other_peer_addr;
             int peers_count;
+            int files_count;
+            vector<File> files;
             switch(action){
                 case 1:
                     // Get current peers
@@ -107,6 +122,27 @@ int main()
                     }
                     break;
                 case 2:
+                    ping = T_GETFILES;
+                    cout<<"Getting files...\n";
+                    if (send(tracker_fd, &ping, sizeof(ping), 0) < 0){
+                        printError("error while sending request to tracker");
+                        return -1;
+                    }
+                    if (read(tracker_fd, &files_count, sizeof(files_count)) < 0){
+                        printError("error while reading tracker response");
+                        return -1;
+                    }
+                    cout<<"There are "<<files_count<<" files on the network\n";
+                    for(int i = 0; i < files_count; i++){
+                        File file;
+                        memset(&file,0,sizeof(file));
+                        if (read(tracker_fd, &file, sizeof(file)) < 0){
+                            printError("error while reading tracker response");
+                            return -1;
+                        }
+                        files.push_back(file);
+                        cout<<"File "<<i+1<<": "<<file.name<<"."<<file.extension<<" ("<<file.size<<" bytes)\n";
+                    }
                     // Get files on the network
                     break;
                 case 3:
@@ -132,6 +168,43 @@ int main()
                 printError("error while accepting connection from peer");
                 return -1;
             }
+            pid_t pid2 = fork();
+            if(pid < 0){
+                printError("fork error");
+                return -1;
+            }
+            else if(pid2 == 0){
+                // Child - server code
+                // Inchid descriptorul vechi si procesez copilul
+                close(sock_fd);
+                Requests request;
+                if (read(peer_fd, &request, sizeof(request)) < 0)
+                {
+                    printError("error while reading request from peer");
+                    return -1;
+                }
+                int files_count = 0;
+                switch (request){
+                    case T_GETFILES:
+                        // Trimitem nr + proprietatile fisierelor
+                        //printf("\nSending files to peer\n");
+                        if(write(peer_fd,&files_count,sizeof(files_count)) < 0){
+                            printError("error while writing to peer file count");
+                            return -1;
+                        }
+                        break;
+                    default:
+                        break;
+                }
+                close(peer_fd);
+                return 0;
+            }
+            else{
+                // Parent - server code
+                // Inchid descriptorul nou si reiau loop-ul
+                close(peer_fd);
+            }
+            
         }
     }
     else{
