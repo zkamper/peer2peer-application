@@ -141,7 +141,7 @@ int main()
                             return -1;
                         }
                         files.push_back(file);
-                        cout<<"File "<<i+1<<": "<<file.name<<"."<<file.extension<<" ("<<file.size<<" bytes)\n";
+                        cout<<"File "<<i+1<<": "<<file.name<<"\n\tExtension: "<<file.extension<<"\n\tSize: ("<<file.size<<" bytes)\n";
                     }
                     // Get files on the network
                     break;
@@ -184,13 +184,22 @@ int main()
                     return -1;
                 }
                 int files_count = 0;
+                vector<File> files;
+                files.clear();
                 switch (request){
                     case T_GETFILES:
                         // Trimitem nr + proprietatile fisierelor
+                        files_count = getFiles(options.files_path,files);
                         //printf("\nSending files to peer\n");
                         if(write(peer_fd,&files_count,sizeof(files_count)) < 0){
                             printError("error while writing to peer file count");
                             return -1;
+                        }
+                        for(int i = 0; i < files_count; i++){
+                            if(write(peer_fd,&files[i],sizeof(files[i])) < 0){
+                                printError("error while writing to peer file");
+                                return -1;
+                            }
                         }
                         break;
                     default:

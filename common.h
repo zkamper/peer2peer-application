@@ -37,8 +37,8 @@ enum Requests{
 };
 
 struct File{
-    char name[128];     // Numele fisierului
-    char hash[256];     // Hash-ul fisierului
+    char name[256];     // Numele fisierului
+    char hash[65];     // Hash-ul fisierului
     char extension[10]; // Extensia fisierului
     int size;           // Dimensiunea fisierului
 };
@@ -53,6 +53,47 @@ char* getAddressReadable(sockaddr_in addr){
     char* addr_readable = new char[256];
     sprintf(addr_readable, "%s:%d", inet_ntoa(addr.sin_addr), htons(addr.sin_port));
     return addr_readable;
+}
+
+int getFiles(char* path, vector<File> &files){
+    DIR *dir;
+    struct dirent *ent;
+    dir = opendir(path);
+    if(dir == nullptr){
+        printError("error while opening directory");
+        return -1;
+    }
+    while((ent = readdir(dir)) != nullptr){
+        if(ent->d_type != DT_REG)
+            continue;
+        File file;
+        memset(&file,0,sizeof(file));
+        strcpy(file.name,ent->d_name);
+        char extension[10];
+        strcpy(extension,strchr(ent->d_name,'.')+1);
+        strcpy(file.extension,extension);
+        char file_path[512];
+        strcpy(file_path,path);
+        strcat(file_path,"/");
+        strcat(file_path,ent->d_name);
+        struct stat file_stats;
+        if(stat(file_path,&file_stats) < 0){
+            printError("error while getting file stats");
+            return -1;
+        }
+        file.size = file_stats.st_size;
+        char command[600];
+        sprintf(command,"sha256sum %s",file_path);
+        FILE* fp = popen(command,"r");
+        if(fp == nullptr){
+            printError("error while getting file hash");
+        }
+        fgets(file.hash,64,fp);
+        files.push_back(file);
+    }
+    closedir(dir);
+    int files_count = files.size();
+    return files_count;
 }
 
 int bindSocket(int &sock_fd, sockaddr_in &server_addr){
