@@ -1,3 +1,8 @@
+# Ignore executables
+*
+!*/
+!*.*
+
 # Ignore all folders named "downloads"
 **/downloads/
 
@@ -6,7 +11,3 @@ client2/
 client3/
 client4/
 
-# Ignore executables
-*
-!*/
-!*.*
