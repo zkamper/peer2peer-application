@@ -93,7 +93,7 @@ int main()
             if (tracker_fd < 0){
                 return -1;
             }
-            cout<<"\nEnter number of action you wish to execute: \n\t (1) Get current peers\n\t (2) Get files on the network\n\t (3) Exit\n\nCommand: ";
+            cout<<"\n\033[4mEnter number of action you wish to execute:\033[0m \n\t (1) Get current peers\n\t (2) Get files on the network\n\t (3) Exit\n\nCommand: ";
             char option[2];
             scanf("%s",option);
             int action = atoi(option);
@@ -113,6 +113,9 @@ int main()
             files.clear();
             vector<sockaddr_in> peers_with_file;
             peers_with_file.clear();
+            SearchOpt search;
+            memset(&search,0,sizeof(search));
+            char size_str[10];
             switch(action){
                 case 1:
                     // Get current peers
@@ -149,6 +152,30 @@ int main()
                         return -1;
                     }
                     // TODO: send criteria to search by
+                    cout<<"Search file by name (type - to search all files):";
+                    scanf("%s",search.name);
+                    if(strcmp(search.name,"-") != 0){
+                        search.by_name = 1;
+                    }else{
+                        search.by_name = 0;
+                    }
+                    cout<<"Search file by extension (type - to search all extensions):";
+                    scanf("%s",search.extension);
+                    if(strcmp(search.extension,"-") != 0){
+                        search.by_extension = 1;
+                    }else{
+                        search.by_extension = 0;
+                    }
+                    cout<<"Minimum size (type 0 for any; example 5K | 15M):";
+                    scanf("%s",size_str);
+                    search.min_size = convertFileSize(size_str);
+                    cout<<"Maximum size (type 0 for any; example 5K | 15M):";
+                    scanf("%s",size_str);
+                    search.max_size = convertFileSize(size_str);
+                    if (send(tracker_fd, &search, sizeof(search), 0) < 0){
+                        printError("error while sending request to tracker");
+                        return -1;
+                    }
                     if (read(tracker_fd, &files_count, sizeof(files_count)) < 0){
                         printError("error while reading tracker response");
                         return -1;
@@ -177,7 +204,7 @@ int main()
                     for(int i = 0; i < files_count; i++){
                         cout<<"("<<i+1<<"): "<<files[i].name<<" - "<<files[i].size<<" bytes\n";
                     }
-                    cout<<"Enter number of file you wish to download (0 for none): ";
+                    cout<<"\033[4mEnter number of file you wish to download (0 for none):\033[0m ";
                     scanf("%s",file_number);
                     file_index = atoi(file_number);
                     if(file_index < 1 || file_index > files_count){

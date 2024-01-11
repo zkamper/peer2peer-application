@@ -46,8 +46,10 @@ enum Requests{
 struct SearchOpt{
     char name[256];
     char extension[10];
-    int min_size;
+    long int min_size;
     int max_size;
+    bool by_name;
+    bool by_extension;
 };
 
 struct File{
@@ -58,22 +60,34 @@ struct File{
 };
 
 int convertFileSize(char* size){
-    int size_int = 0;
-    char* size_str = strtok(size," ");
-    size_int = atoi(size_str);
-    size_str = strtok(nullptr," ");
-    if(strcmp(size_str,"KB") == 0){
-        size_int *= 1024;
+    int len = strlen(size);
+    int multiplier = 1;
+    if(size[len-1] == 'K'){
+        multiplier = 1024;
+        size[len-1] = '\0';
     }
-    else if(strcmp(size_str,"MB") == 0){
-        size_int *= 1024*1024;
+    else if(size[len-1] == 'M'){
+        multiplier = 1024*1024;
+        size[len-1] = '\0';
     }
-    else if(strcmp(size_str,"GB") == 0){
-        size_int *= 1024*1024*1024;
+    else if(size[len-1] == 'G'){
+        multiplier = 1024*1024*1024;
+        size[len-1] = '\0';
     }
-    return size_int;
+    return atoi(size)*multiplier;
 }
 
+bool matchesCriteria(File file, SearchOpt search){
+    if(search.by_name && strstr(file.name,search.name) == nullptr)
+        return false;
+    if(search.by_extension && strcmp(file.extension,search.extension) != 0)
+        return false;
+    if(search.min_size > 0 && file.size < search.min_size)
+        return false;
+    if(search.max_size > 0 && file.size > search.max_size)
+        return false;
+    return true;
+}
 
 struct Options{
     char files_path[256];   // Calea către directorul cu fișiere pentru a fi incarcate in retea (default se va folosi ./downloads)

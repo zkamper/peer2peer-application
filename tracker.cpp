@@ -16,6 +16,7 @@ void *handlePeer(void *arg){
     unordered_map<string,File> files;
     char hash[65];
     vector<sockaddr_in> peers_with_file;
+    SearchOpt search;
     switch(request){
         case T_ONLINE:
             sockaddr_in peer_addr;
@@ -57,6 +58,10 @@ void *handlePeer(void *arg){
             }
             break;
         case T_GETFILES:
+            if(read(peer_fd,&search,sizeof(search)) < 0){
+                printError("error while reading from peer");
+                return nullptr;
+            }
             cout<<TRACKER<<"Files request from "<<getAddressReadable(peer_addr)<<endl;
             for(int i = 0; i < peers_count; i++){
                 int other_peer = socket(AF_INET,SOCK_STREAM,0);
@@ -86,7 +91,8 @@ void *handlePeer(void *arg){
                         printError("error while reading from peer");
                         return nullptr;
                     }
-                    files[file.hash] = file;
+                    if(matchesCriteria(file,search))
+                        files[file.hash] = file;
                 }
                 close(other_peer);
             }
