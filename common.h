@@ -174,7 +174,7 @@ void getFileChunk(int other_peer, char *file_name, int offset, int chunk_size, F
     read(other_peer, chunk, sizeof(chunk));
     fseek(file_fd, offset, SEEK_SET);
     fwrite(chunk, sizeof(char), chunk_size, file_fd);
-    printf("Received chunk: %s\n", chunk);
+    //printf("Received chunk: %s\n", chunk);
     close(other_peer);
 }
 

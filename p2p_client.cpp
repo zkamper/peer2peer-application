@@ -90,6 +90,7 @@ int main()
             if (tracker_fd < 0){
                 return -1;
             }
+            cout<<genHeaderClient("P2P Client");
             cout<<"\nEnter number of action you wish to execute: \n\t (1) Get current peers\n\t (2) Get files on the network\n\t (3) Exit\n\nCommand: ";
             char option[2];
             scanf("%s",option);
@@ -114,6 +115,7 @@ int main()
                 case 1:
                     // Get current peers
                     ping = T_GETPEERS;
+                    cout<<genHeaderClient("P2P Client");
                     cout<<"Getting peers...\n";
                     if (send(tracker_fd, &ping, sizeof(ping), 0) < 0){
                         printError("error while sending request to tracker");
@@ -134,6 +136,7 @@ int main()
                     break;
                 case 2:
                     ping = T_GETFILES;
+                    cout<<genHeaderClient("FILES");
                     cout<<"Getting files...\n";
                     if (send(tracker_fd, &ping, sizeof(ping), 0) < 0){
                         printError("error while sending request to tracker");
@@ -143,7 +146,7 @@ int main()
                         printError("error while reading tracker response");
                         return -1;
                     }
-                    cout<<"There are "<<files_count<<" files on the network\n";
+                    //cout<<"There are "<<files_count<<" files on the network\n";
                     for(int i = 0; i < files_count; i++){
                         File file;
                         memset(&file,0,sizeof(file));
@@ -156,7 +159,6 @@ int main()
                         }
                         else{
                             files.push_back(file);
-                            cout<<"("<<i+1<<"): "<<file.name<<" - size: "<<file.size<<" bytes\n";
                         }
                     }
                     // Get files on the network
@@ -164,6 +166,9 @@ int main()
                     if(files_count == 0){
                         cout<<"No new files on the network\n";
                         break;
+                    }
+                    for(int i = 0; i < files_count; i++){
+                        cout<<"("<<i+1<<"): "<<files[i].name<<" - "<<files[i].size<<" bytes\n";
                     }
                     cout<<"Enter number of file you wish to download (0 for none): ";
                     scanf("%s",file_number);
