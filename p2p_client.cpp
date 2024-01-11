@@ -101,6 +101,7 @@ int main()
             int file_size;
             int other_peer;
             int peer_index;
+            char file_path[512];
             char file_number[3];
             int file_index;
             FILE* file_fd;
@@ -155,7 +156,7 @@ int main()
                         }
                         else{
                             files.push_back(file);
-                            cout<<"File "<<i+1<<": "<<file.name<<"\n\tExtension: "<<file.extension<<"\n\tSize: ("<<file.size<<" bytes)\n";
+                            cout<<"("<<i+1<<"): "<<file.name<<" - size: "<<file.size<<" bytes\n";
                         }
                     }
                     // Get files on the network
@@ -197,7 +198,8 @@ int main()
                         peers_with_file.push_back(other_peer_addr);
                     }
                     file_size = files[file_index-1].size;
-                    file_fd = fopen(files[file_index-1].name,"wb");
+                    sprintf(file_path,"%s/%s",options.files_path,files[file_index-1].name);
+                    file_fd = fopen(file_path,"wb");
                     for(int i = 0; i < file_size/CHUNK_SIZE; i++){
                         other_peer = socket(AF_INET,SOCK_STREAM,0);
                         peer_index = i % peers_with_file.size();
@@ -217,6 +219,8 @@ int main()
                     ping = P_GETFILE;
                     // Trimitem request-ul
                     getFileChunk(other_peer,files[file_index-1].hash,(file_size/CHUNK_SIZE)*CHUNK_SIZE,file_size%CHUNK_SIZE,file_fd);
+                    ftruncate(fileno(file_fd),file_size);
+                    fclose(file_fd);
                     break;
                 case 3:
                     // Exit
@@ -259,6 +263,14 @@ int main()
                 int files_count = 0;
                 vector<File> files;
                 files.clear();
+                char hash[65];
+                char name[256];
+                int offset;
+                int chunk_size;
+                FILE* file_fd;
+                char file_path[512];
+                int have_file;
+                char chunk[CHUNK_SIZE];
                 switch (request){
                     case T_GETFILES:
                         // Trimitem nr + proprietatile fisierelor
@@ -275,6 +287,23 @@ int main()
                             }
                         }
                         break;
+                    case T_GETFILE:
+                        // Trimitem fisierul
+                        read(peer_fd,hash,sizeof(hash));
+                        have_file = searchFile(options.files_path,hash);
+                        write(peer_fd,&have_file,sizeof(have_file));
+                        break;
+                    case P_GETFILE:
+                        read(peer_fd,name,256);
+                        read(peer_fd,&offset,sizeof(offset));
+                        read(peer_fd,&chunk_size,sizeof(chunk_size));
+                        sprintf(file_path,"%s/%s",options.files_path,name);
+                        file_fd = fopen(file_path,"rb");
+                        fseek(file_fd,offset,SEEK_SET);
+                        memset(chunk,0,sizeof(chunk));
+                        fread(chunk,sizeof(char),chunk_size,file_fd);
+                        write(peer_fd,chunk,chunk_size);
+                        fclose(file_fd);
                     default:
                         break;
                 }
