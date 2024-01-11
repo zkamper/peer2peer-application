@@ -108,6 +108,7 @@ int main()
             char file_path[512];
             char file_number[3];
             int file_index;
+            int error_handle;
             FILE* file_fd;
             vector<File> files;
             files.clear();
@@ -239,27 +240,61 @@ int main()
                     file_size = files[file_index-1].size;
                     sprintf(file_path,"%s/%s",options.files_path,files[file_index-1].name);
                     file_fd = fopen(file_path,"wb");
+                    error_handle = 0;
                     for(int i = 0; i < file_size/CHUNK_SIZE; i++){
                         other_peer = socket(AF_INET,SOCK_STREAM,0);
                         peer_index = i % peers_with_file.size();
                         if(connect(other_peer,(struct sockaddr*)&peers_with_file[peer_index],sizeof(peers_with_file[0])) < 0){
                             printError("couldn't connect to peer to request file");
-                            return -1;
+                            peers_with_file.erase(peers_with_file.begin()+peer_index);
+                            i--;
+                            if(peers_with_file.size() == 0){
+                                cout<<"No peers with file currently online\n";
+                                error_handle = 1;
+                                break;
+                            }
+                            continue;
                         }
                         ping = P_GETFILE;
                         // Trimitem request-ul
                         getFileChunk(other_peer,files[file_index-1].name,i*CHUNK_SIZE,CHUNK_SIZE,file_fd);
                     }
-                    other_peer = socket(AF_INET,SOCK_STREAM,0);
-                    if(connect(other_peer,(struct sockaddr*)&peers_with_file[0],sizeof(peers_with_file[0])) < 0){
-                        printError("couldn't connect to peer to request file");
-                        return -1;
+                    if(error_handle == 1){
+                        cout<<"Couldn't download file\n";
+                        fclose(file_fd);
+                        // Delete file
+                        remove(file_path);
+                        break;
                     }
-                    ping = P_GETFILE;
-                    // Trimitem request-ul
-                    getFileChunk(other_peer,files[file_index-1].name,(file_size/CHUNK_SIZE)*CHUNK_SIZE,file_size%CHUNK_SIZE,file_fd);
+                    other_peer = socket(AF_INET,SOCK_STREAM,0);
+                    for(int i = 0; i < peers_with_file.size(); i++){
+                        if(connect(other_peer,(struct sockaddr*)&peers_with_file[i],sizeof(peers_with_file[0])) < 0){
+                            printError("couldn't connect to peer to request file");
+                            peers_with_file.erase(peers_with_file.begin()+i);
+                            i--;
+                            if(peers_with_file.size() == 0){
+                                cout<<"No peers with file currently online\n";
+                                error_handle = 1;
+                                break;
+                            }
+                            continue;
+                        }
+                        ping = P_GETFILE;
+                        // Trimitem request-ul
+                        getFileChunk(other_peer,files[file_index-1].name,(file_size/CHUNK_SIZE)*CHUNK_SIZE,file_size%CHUNK_SIZE,file_fd);
+                        break;
+                    }
                     ftruncate(fileno(file_fd),file_size);
                     fclose(file_fd);
+                    if(error_handle == 1){
+                        cout<<"Couldn't download file\n";
+                        // Delete file
+                        remove(file_path);
+                        break;
+                    }
+                    else{
+                        cout<<"File downloaded successfully\n";
+                    }
                     break;
                 case 3:
                     // Exit
