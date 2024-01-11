@@ -12,7 +12,10 @@ void *handlePeer(void *arg){
     read(peer_fd,&request,sizeof(request));
     int peers_count = peers.size();
     int files_count;
+    int found_file;
     unordered_map<string,File> files;
+    char hash[65];
+    vector<sockaddr_in> peers_with_file;
     switch(request){
         case T_ONLINE:
             sockaddr_in peer_addr;
@@ -98,6 +101,34 @@ void *handlePeer(void *arg){
                     printError("error while writing to peer file data");
                     return nullptr;
                 }
+            }
+            break;
+        case T_GETFILE:
+            cout<<TRACKER<<"File request from "<<getAddressReadable(peer_addr)<<endl;
+            read(peer_fd,hash,sizeof(hash));
+            for(int i = 0; i < peers_count; i++){
+                int other_peer = socket(AF_INET,SOCK_STREAM,0);
+                if(connect(other_peer,(struct sockaddr*)&peers[i],sizeof(peers[i])) < 0){
+                    printError("couldn't connect to peer to request file");
+                    return nullptr;
+                }
+                request = T_GETFILE;
+                // Trimitem request-ul                
+                write(other_peer,&request,sizeof(request));
+                // Trimitem hash-ul
+                write(other_peer,hash,sizeof(hash));
+                read(other_peer,&found_file,sizeof(found_file));
+                if(!found_file){
+                    close(other_peer);
+                    continue;
+                }
+                peers_with_file.push_back(peers[i]);
+                close(other_peer);
+            }
+            peers_count = peers_with_file.size();
+            write(peer_fd,&peers_count,sizeof(peers_count));
+            for(int i = 0; i < peers_count; i++){
+                write(peer_fd,&peers_with_file[i],sizeof(peers_with_file[i]));
             }
             break;
         default:

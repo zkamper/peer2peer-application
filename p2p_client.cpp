@@ -98,7 +98,17 @@ int main()
             sockaddr_in other_peer_addr;
             int peers_count;
             int files_count;
+            int file_size;
+            int other_peer;
+            int peer_index;
+            char file_number[3];
+            int file_index;
+            FILE* file_fd;
             vector<File> files;
+            files.clear();
+            vector<sockaddr_in> peers_with_file;
+            peers_with_file.clear();
+            peers_with_file.clear();
             switch(action){
                 case 1:
                     // Get current peers
@@ -140,10 +150,73 @@ int main()
                             printError("error while reading tracker response");
                             return -1;
                         }
-                        files.push_back(file);
-                        cout<<"File "<<i+1<<": "<<file.name<<"\n\tExtension: "<<file.extension<<"\n\tSize: ("<<file.size<<" bytes)\n";
+                        if(searchFile(options.files_path,file.hash)){
+                            continue;
+                        }
+                        else{
+                            files.push_back(file);
+                            cout<<"File "<<i+1<<": "<<file.name<<"\n\tExtension: "<<file.extension<<"\n\tSize: ("<<file.size<<" bytes)\n";
+                        }
                     }
                     // Get files on the network
+                    files_count = files.size();
+                    if(files_count == 0){
+                        cout<<"No new files on the network\n";
+                        break;
+                    }
+                    cout<<"Enter number of file you wish to download (0 for none): ";
+                    scanf("%s",file_number);
+                    file_index = atoi(file_number);
+                    if(file_index < 1 || file_index > files_count){
+                        cout<<"Invalid file number\n";
+                        break;
+                    }
+                    tracker_fd = connectToTracker(tracker_addr);
+                    ping = T_GETFILE;
+                    if (send(tracker_fd, &ping, sizeof(ping), 0) < 0){
+                        printError("error while sending request to tracker");
+                        return -1;
+                    }
+                    if (send(tracker_fd, &files[file_index-1].hash, sizeof(files[file_index-1].hash), 0) < 0){
+                        printError("error while sending request to tracker");
+                        return -1;
+                    }
+                    if (read(tracker_fd, &peers_count, sizeof(peers_count)) < 0){
+                        printError("error while reading tracker response");
+                        return -1;
+                    }
+                    if(peers_count == 0){
+                        cout<<"No peers with file currently online\n";
+                        break;
+                    }
+                    for(int i = 0; i < peers_count; i++){
+                        if (read(tracker_fd, &other_peer_addr, sizeof(other_peer_addr)) < 0){
+                            printError("error while reading tracker response");
+                            return -1;
+                        }
+                        peers_with_file.push_back(other_peer_addr);
+                    }
+                    file_size = files[file_index-1].size;
+                    file_fd = fopen(files[file_index-1].name,"wb");
+                    for(int i = 0; i < file_size/CHUNK_SIZE; i++){
+                        other_peer = socket(AF_INET,SOCK_STREAM,0);
+                        peer_index = i % peers_with_file.size();
+                        if(connect(other_peer,(struct sockaddr*)&peers_with_file[peer_index],sizeof(peers_with_file[0])) < 0){
+                            printError("couldn't connect to peer to request file");
+                            return -1;
+                        }
+                        ping = P_GETFILE;
+                        // Trimitem request-ul
+                        getFileChunk(other_peer,files[file_index-1].hash,i*CHUNK_SIZE,CHUNK_SIZE,file_fd);
+                    }
+                    other_peer = socket(AF_INET,SOCK_STREAM,0);
+                    if(connect(other_peer,(struct sockaddr*)&peers_with_file[0],sizeof(peers_with_file[0])) < 0){
+                        printError("couldn't connect to peer to request file");
+                        return -1;
+                    }
+                    ping = P_GETFILE;
+                    // Trimitem request-ul
+                    getFileChunk(other_peer,files[file_index-1].hash,(file_size/CHUNK_SIZE)*CHUNK_SIZE,file_size%CHUNK_SIZE,file_fd);
                     break;
                 case 3:
                     // Exit

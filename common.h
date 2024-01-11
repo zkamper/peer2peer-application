@@ -7,6 +7,7 @@
 #include <unistd.h>
 #include <errno.h>
 #include <stdio.h>
+#include <cstdio>
 #include <arpa/inet.h>
 #include <string.h>
 #include <sys/wait.h>
@@ -18,10 +19,14 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <unordered_map>
+#include <fcntl.h>
+#include <fstream>
+#include <sys/ioctl.h>
 
 #define PORT 8000
-#define MAX_PORT 8256   // Portul maxim pentru a asocia unui peer
-#define PORT_TRACKER 7999 // Port unic pentru tracker
+#define MAX_PORT 8256       // Portul maxim pentru a asocia unui peer
+#define PORT_TRACKER 7999   // Port unic pentru tracker
+#define CHUNK_SIZE 1024     // Dimensiunea unui chunk
 
 #define ERROR "\033[31mERROR: \033[0m"
 #define TRACKER "\033[34m[ TRACKER ] \033[0m"
@@ -34,6 +39,8 @@ enum Requests{
     T_OFFLINE,
     T_GETFILES,
     T_GETPEERS,
+    T_GETFILE,
+    P_GETFILE
 };
 
 struct File{
@@ -53,6 +60,86 @@ char* getAddressReadable(sockaddr_in addr){
     char* addr_readable = new char[256];
     sprintf(addr_readable, "%s:%d", inet_ntoa(addr.sin_addr), htons(addr.sin_port));
     return addr_readable;
+}
+
+const char* genHeaderClient(const char* msg){
+    winsize size;
+    ioctl(STDOUT_FILENO,TIOCGWINSZ,&size);
+    int width = size.ws_col;
+    char* header_top = new char[width];
+    char* header_msg = new char[width];
+    memset(header_top,0,width);
+    memset(header_msg,0,width);
+    header_top[0] = '+';
+    header_top[width-1] = '+';
+    header_msg[0] = '|';
+    header_msg[width-1] = '|';
+    for(int i = 1 ; i < width - 1 ; i ++){
+        header_top[i] = '-';
+        header_msg[i] = ' ';
+    }
+    int start = (width - strlen(msg))/2;
+    int finish = start + strlen(msg);
+    for(int i = start; i < finish; i++){
+        header_msg[i] = msg[i-start];
+    }
+    char* header = new char[width*3];
+    memset(header,0,width*3);
+    sprintf(header,"%s\n%s\n%s",header_top,header_msg,header_top);
+    return header;
+}
+
+// Returns 1 if file is found, 0 otherwise
+int searchFile(char* path, char* hash){
+    DIR* dir;
+    struct dirent *ent;
+    dir = opendir(path);
+    if(dir == nullptr){
+        printError("error while opening directory");
+        return -1;
+    }
+    while((ent = readdir(dir)) != nullptr){
+        if(ent->d_type != DT_REG)
+            continue;
+        char file_path[512];
+        strcpy(file_path,path);
+        strcat(file_path,"/");
+        strcat(file_path,ent->d_name);
+        char command[600];
+        strcpy(command,"sha256sum \"");
+        strcat(command,file_path);
+        strcat(command,"\"");
+        FILE* fp = popen(command,"r");
+        if(fp == nullptr){
+            printError("error while getting file hash");
+        }
+        char other_hash[65];
+        fgets(other_hash,64,fp);
+        if(strcmp(hash,other_hash) == 0){
+            return 1;
+        }
+    }
+    closedir(dir);
+    return 0;
+}
+
+void getFileChunk(int other_peer, char *file_name, int offset, int chunk_size, FILE *file_fd){
+    Requests ping = P_GETFILE;
+    // Request P_GET FILE - file name - offset - chunk size
+    send(other_peer, &ping, sizeof(ping), 0);
+    char name[256];
+    memset(name, 0, sizeof(name));
+    strcpy(name, file_name);
+    send(other_peer, name, 256, 0);
+    send(other_peer, &offset, sizeof(offset), 0);
+    send(other_peer, &chunk_size, sizeof(chunk_size), 0);
+    // Receive chunk
+    char chunk[CHUNK_SIZE];
+    memset(chunk, 0, sizeof(chunk));
+    read(other_peer, chunk, sizeof(chunk));
+    fseek(file_fd, offset, SEEK_SET);
+    fwrite(chunk, sizeof(char), chunk_size, file_fd);
+    close(other_peer);
 }
 
 int getFiles(char* path, vector<File> &files){
@@ -97,6 +184,7 @@ int getFiles(char* path, vector<File> &files){
     int files_count = files.size();
     return files_count;
 }
+
 
 int bindSocket(int &sock_fd, sockaddr_in &server_addr){
     //We initiate TCP socket
