@@ -62,7 +62,7 @@ char* getAddressReadable(sockaddr_in addr){
     return addr_readable;
 }
 
-const char* genHeaderClient(const char* msg){
+void genHeaderClient(char header[1024], const char* msg){
     winsize size;
     ioctl(STDOUT_FILENO,TIOCGWINSZ,&size);
     int width = size.ws_col;
@@ -83,10 +83,9 @@ const char* genHeaderClient(const char* msg){
     for(int i = start; i < finish; i++){
         header_msg[i] = msg[i-start];
     }
-    char* header = new char[width*3];
-    memset(header,0,width*3);
+    memset(header,0,1024);
     sprintf(header,"%s\n%s\n%s",header_top,header_msg,header_top);
-    return header;
+    return;
 }
 
 // Returns 1 if file is found, 0 otherwise

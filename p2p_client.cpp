@@ -84,18 +84,21 @@ int main()
         signal(SIGINT, handle_sig);
         signal(SIGUSR1, handle_sig); // Semnal special pentru a opri clientul din copil
         close(sock_fd);
+        char header[1024];
         while(true){
             close(tracker_fd);
             tracker_fd = connectToTracker(tracker_addr);
             if (tracker_fd < 0){
                 return -1;
             }
-            cout<<genHeaderClient("P2P Client");
+            genHeaderClient(header,"P2P Client");
+            cout<<header;
             cout<<"\nEnter number of action you wish to execute: \n\t (1) Get current peers\n\t (2) Get files on the network\n\t (3) Exit\n\nCommand: ";
             char option[2];
             scanf("%s",option);
             int action = atoi(option);
             Requests ping;
+            system("clear");
             sockaddr_in other_peer_addr;
             int peers_count;
             int files_count;
@@ -110,12 +113,13 @@ int main()
             files.clear();
             vector<sockaddr_in> peers_with_file;
             peers_with_file.clear();
-            peers_with_file.clear();
             switch(action){
                 case 1:
                     // Get current peers
                     ping = T_GETPEERS;
-                    cout<<genHeaderClient("P2P Client");
+                    memset(header,0,sizeof(header));
+                    genHeaderClient(header,"PEERS");
+                    cout<<header;
                     cout<<"Getting peers...\n";
                     if (send(tracker_fd, &ping, sizeof(ping), 0) < 0){
                         printError("error while sending request to tracker");
@@ -136,7 +140,8 @@ int main()
                     break;
                 case 2:
                     ping = T_GETFILES;
-                    cout<<genHeaderClient("FILES");
+                    genHeaderClient(header,"FILES");
+                    cout<<header;
                     cout<<"Getting files...\n";
                     if (send(tracker_fd, &ping, sizeof(ping), 0) < 0){
                         printError("error while sending request to tracker");
@@ -313,7 +318,7 @@ int main()
                         break;
                 }
                 close(peer_fd);
-                return 0;
+                exit(0);
             }
             else{
                 // Parent - server code
