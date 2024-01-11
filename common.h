@@ -51,7 +51,7 @@ struct File{
 };
 
 struct Options{
-    char files_path[256];   // Calea către directorul cu fișiere pentru a fi incarcate in retea (default se va folosi ./p2p_files)
+    char files_path[256];   // Calea către directorul cu fișiere pentru a fi incarcate in retea (default se va folosi ./downloads)
 };
 
 void printError(const char* msg) { char msg_err[256]; sprintf(msg_err, "%s%s", ERROR, msg); perror(msg_err); }
@@ -123,6 +123,41 @@ int searchFile(char* path, char* hash){
     return 0;
 }
 
+void searchFileName(char* name, char* path,char* hash){
+    DIR* dir;
+    struct dirent *ent;
+    dir = opendir(path);
+    if(dir == nullptr){
+        printError("error while opening directory");
+        return;
+    }
+    while((ent = readdir(dir)) != nullptr){
+        if(ent->d_type != DT_REG)
+            continue;
+        char file_path[512];
+        strcpy(file_path,path);
+        strcat(file_path,"/");
+        strcat(file_path,ent->d_name);
+        char command[600];
+        strcpy(command,"sha256sum \"");
+        strcat(command,file_path);
+        strcat(command,"\"");
+        FILE* fp = popen(command,"r");
+        if(fp == nullptr){
+            printError("error while getting file hash");
+        }
+        char other_hash[65];
+        fgets(other_hash,64,fp);
+        if(strcmp(hash,other_hash) == 0){
+            strcpy(name,ent->d_name);
+            closedir(dir);
+            return;
+        }
+    }
+    closedir(dir);
+    return;
+}
+
 void getFileChunk(int other_peer, char *file_name, int offset, int chunk_size, FILE *file_fd){
     Requests ping = P_GETFILE;
     // Request P_GET FILE - file name - offset - chunk size
@@ -139,6 +174,7 @@ void getFileChunk(int other_peer, char *file_name, int offset, int chunk_size, F
     read(other_peer, chunk, sizeof(chunk));
     fseek(file_fd, offset, SEEK_SET);
     fwrite(chunk, sizeof(char), chunk_size, file_fd);
+    printf("Received chunk: %s\n", chunk);
     close(other_peer);
 }
 

@@ -209,7 +209,7 @@ int main()
                         }
                         ping = P_GETFILE;
                         // Trimitem request-ul
-                        getFileChunk(other_peer,files[file_index-1].hash,i*CHUNK_SIZE,CHUNK_SIZE,file_fd);
+                        getFileChunk(other_peer,files[file_index-1].name,i*CHUNK_SIZE,CHUNK_SIZE,file_fd);
                     }
                     other_peer = socket(AF_INET,SOCK_STREAM,0);
                     if(connect(other_peer,(struct sockaddr*)&peers_with_file[0],sizeof(peers_with_file[0])) < 0){
@@ -218,7 +218,7 @@ int main()
                     }
                     ping = P_GETFILE;
                     // Trimitem request-ul
-                    getFileChunk(other_peer,files[file_index-1].hash,(file_size/CHUNK_SIZE)*CHUNK_SIZE,file_size%CHUNK_SIZE,file_fd);
+                    getFileChunk(other_peer,files[file_index-1].name,(file_size/CHUNK_SIZE)*CHUNK_SIZE,file_size%CHUNK_SIZE,file_fd);
                     ftruncate(fileno(file_fd),file_size);
                     fclose(file_fd);
                     break;
