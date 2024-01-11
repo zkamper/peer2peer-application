@@ -85,14 +85,14 @@ int main()
         signal(SIGUSR1, handle_sig); // Semnal special pentru a opri clientul din copil
         close(sock_fd);
         char header[1024];
+        genHeaderClient(header,"P2P Client");
+        printf("%s",header);
         while(true){
             close(tracker_fd);
             tracker_fd = connectToTracker(tracker_addr);
             if (tracker_fd < 0){
                 return -1;
             }
-            genHeaderClient(header,"P2P Client");
-            cout<<header;
             cout<<"\nEnter number of action you wish to execute: \n\t (1) Get current peers\n\t (2) Get files on the network\n\t (3) Exit\n\nCommand: ";
             char option[2];
             scanf("%s",option);
@@ -119,7 +119,7 @@ int main()
                     ping = T_GETPEERS;
                     memset(header,0,sizeof(header));
                     genHeaderClient(header,"PEERS");
-                    cout<<header;
+                    printf("%s",header);
                     cout<<"Getting peers...\n";
                     if (send(tracker_fd, &ping, sizeof(ping), 0) < 0){
                         printError("error while sending request to tracker");
@@ -140,13 +140,15 @@ int main()
                     break;
                 case 2:
                     ping = T_GETFILES;
+                    memset(header,0,sizeof(header));
                     genHeaderClient(header,"FILES");
-                    cout<<header;
+                    printf("%s",header);
                     cout<<"Getting files...\n";
                     if (send(tracker_fd, &ping, sizeof(ping), 0) < 0){
                         printError("error while sending request to tracker");
                         return -1;
                     }
+                    // TODO: send criteria to search by
                     if (read(tracker_fd, &files_count, sizeof(files_count)) < 0){
                         printError("error while reading tracker response");
                         return -1;
@@ -234,6 +236,9 @@ int main()
                     break;
                 case 3:
                     // Exit
+                    memset(header,0,sizeof(header));
+                    genHeaderClient(header,"EXIT");
+                    printf("%s",header);
                     handle_sig(SIGQUIT);
                     break;
                 default:

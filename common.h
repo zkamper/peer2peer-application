@@ -43,12 +43,37 @@ enum Requests{
     P_GETFILE
 };
 
+struct SearchOpt{
+    char name[256];
+    char extension[10];
+    int min_size;
+    int max_size;
+};
+
 struct File{
     char name[256];     // Numele fisierului
     char hash[65];     // Hash-ul fisierului
     char extension[10]; // Extensia fisierului
     int size;           // Dimensiunea fisierului
 };
+
+int convertFileSize(char* size){
+    int size_int = 0;
+    char* size_str = strtok(size," ");
+    size_int = atoi(size_str);
+    size_str = strtok(nullptr," ");
+    if(strcmp(size_str,"KB") == 0){
+        size_int *= 1024;
+    }
+    else if(strcmp(size_str,"MB") == 0){
+        size_int *= 1024*1024;
+    }
+    else if(strcmp(size_str,"GB") == 0){
+        size_int *= 1024*1024*1024;
+    }
+    return size_int;
+}
+
 
 struct Options{
     char files_path[256];   // Calea către directorul cu fișiere pentru a fi incarcate in retea (default se va folosi ./downloads)
@@ -66,25 +91,7 @@ void genHeaderClient(char header[1024], const char* msg){
     winsize size;
     ioctl(STDOUT_FILENO,TIOCGWINSZ,&size);
     int width = size.ws_col;
-    char* header_top = new char[width];
-    char* header_msg = new char[width];
-    memset(header_top,0,width);
-    memset(header_msg,0,width);
-    header_top[0] = '+';
-    header_top[width-1] = '+';
-    header_msg[0] = '|';
-    header_msg[width-1] = '|';
-    for(int i = 1 ; i < width - 1 ; i ++){
-        header_top[i] = '-';
-        header_msg[i] = ' ';
-    }
-    int start = (width - strlen(msg))/2;
-    int finish = start + strlen(msg);
-    for(int i = start; i < finish; i++){
-        header_msg[i] = msg[i-start];
-    }
-    memset(header,0,1024);
-    sprintf(header,"%s\n%s\n%s",header_top,header_msg,header_top);
+    sprintf(header, "%s-----%s-----%s", "\033[1;32m", msg, "\033[0m\n");
     return;
 }
 
