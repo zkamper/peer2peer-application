@@ -5,16 +5,16 @@
 vector<sockaddr_in> peers;
 pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
 
+// Handles request from peers
 void *handlePeer(void *arg){
     Requests request;
     int peer_fd = *(int*)arg;
-    // Handle Request
     read(peer_fd,&request,sizeof(request));
-    int peers_count = peers.size();
-    int files_count;
-    int found_file;
-    unordered_map<string,File> files;
+
+    //Variabile folosite în switch
+    int peers_count = peers.size(),files_count,found_file;
     char hash[65];
+    unordered_map<string,File> files;
     vector<sockaddr_in> peers_with_file;
     SearchOpt search;
     switch(request){

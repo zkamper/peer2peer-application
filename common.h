@@ -59,6 +59,10 @@ struct File{
     int size;           // Dimensiunea fisierului
 };
 
+struct Options{
+    char files_path[256];   // Calea către directorul cu fișiere pentru a fi incarcate in retea (default se va folosi ./downloads)
+};
+
 int convertFileSize(char* size){
     int len = strlen(size);
     int multiplier = 1;
@@ -89,9 +93,7 @@ bool matchesCriteria(File file, SearchOpt search){
     return true;
 }
 
-struct Options{
-    char files_path[256];   // Calea către directorul cu fișiere pentru a fi incarcate in retea (default se va folosi ./downloads)
-};
+
 
 void printError(const char* msg) { char msg_err[256]; sprintf(msg_err, "%s%s", ERROR, msg); perror(msg_err); }
 
@@ -241,7 +243,7 @@ int getFiles(char* path, vector<File> &files){
     return files_count;
 }
 
-
+// Wrappers for socket function
 int bindSocket(int &sock_fd, sockaddr_in &server_addr){
     //We initiate TCP socket
     sock_fd = socket(AF_INET,SOCK_STREAM,0);

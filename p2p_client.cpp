@@ -16,6 +16,7 @@ void handle_sig(int sig){
     exit(0);
 }
 
+// Initialize options
 void initOptions(){
     strcpy(options.files_path,"./downloads");
     if(opendir(options.files_path) == nullptr){
@@ -29,23 +30,19 @@ void initOptions(){
 int main()
 {
     // Init phase - initializam peer-ul + conexiunea la tracker
-    
     initOptions();
-
-    if (bindSocket(sock_fd, server_addr) < 0)
-    {
+    if (bindSocket(sock_fd, server_addr) < 0){
         char err_msg[256];
         sprintf(err_msg, "bind error at port %d", ntohs(server_addr.sin_port));
         printError(err_msg);
         return -1;
     }
-    
-    if (listen(sock_fd, 10) < 0)
-    {
+    if (listen(sock_fd, 10) < 0){
         printError("error while listening for peers");
         return -1;
     }
-    // Ping la tracker
+
+    // Conectare la tracker
     sockaddr_in tracker_addr;
     tracker_fd = connectToTracker(tracker_addr);
     if (tracker_fd < 0){
@@ -53,7 +50,6 @@ int main()
     }
 
     Requests ping = T_ONLINE;
-
     if (send(tracker_fd, &ping, sizeof(ping), 0) < 0){
         printError("tracker appears to be offline");
         return -1;
@@ -70,6 +66,8 @@ int main()
         printError("connection to tracker rejected");
         return -1;
     }
+
+    // Conexiune cu tracker stabilita
     cout << "[ " << inet_ntoa(server_addr.sin_addr) << " ] Server started at port " << ntohs(server_addr.sin_port) << endl;
 
 /*
@@ -77,16 +75,17 @@ int main()
     si componenta ce se conecteaza la alti peers (client)
 */
     system("clear");
-    
     if ((pid = fork())){
         // Parent - client code
         signal(SIGQUIT, handle_sig);
         signal(SIGINT, handle_sig);
         signal(SIGUSR1, handle_sig); // Semnal special pentru a opri clientul din copil
         close(sock_fd);
+
         char header[1024];
         genHeaderClient(header,"P2P Client");
         printf("%s",header);
+
         while(true){
             close(tracker_fd);
             tracker_fd = connectToTracker(tracker_addr);
@@ -94,29 +93,23 @@ int main()
                 return -1;
             }
             cout<<"\n\033[4mEnter number of action you wish to execute:\033[0m \n\t (1) Get current peers\n\t (2) Get files on the network\n\t (3) Exit\n\nCommand: ";
+            system("clear");
             char option[2];
             scanf("%s",option);
             int action = atoi(option);
             Requests ping;
-            system("clear");
             sockaddr_in other_peer_addr;
-            int peers_count;
-            int files_count;
-            int file_size;
-            int other_peer;
-            int peer_index;
-            char file_path[512];
-            char file_number[3];
-            int file_index;
-            int error_handle;
-            FILE* file_fd;
-            vector<File> files;
-            files.clear();
-            vector<sockaddr_in> peers_with_file;
-            peers_with_file.clear();
+
+            // Variabile folosite in switch statement
+            int peers_count,files_count,file_size,other_peer,peer_index,file_index,error_handle;
+            char file_path[512],file_number[3],size_str[10];
             SearchOpt search;
             memset(&search,0,sizeof(search));
-            char size_str[10];
+            FILE* file_fd;
+            vector<File> files;
+            vector<sockaddr_in> peers_with_file;
+            files.clear();
+            peers_with_file.clear();
             switch(action){
                 case 1:
                     // Get current peers
@@ -152,7 +145,6 @@ int main()
                         printError("error while sending request to tracker");
                         return -1;
                     }
-                    // TODO: send criteria to search by
                     cout<<"Search file by name (type - to search all files):";
                     scanf("%s",search.name);
                     if(strcmp(search.name,"-") != 0){
@@ -337,17 +329,13 @@ int main()
                     printError("error while reading request from peer");
                     return -1;
                 }
-                int files_count = 0;
+
+                // Variabile folosite in switch
+                int files_count = 0,offset,chunk_size,have_file;
+                char file_path[512],chunk[CHUNK_SIZE],name[256],hash[65];
                 vector<File> files;
                 files.clear();
-                char hash[65];
-                char name[256];
-                int offset;
-                int chunk_size;
                 FILE* file_fd;
-                char file_path[512];
-                int have_file;
-                char chunk[CHUNK_SIZE];
                 switch (request){
                     case T_GETFILES:
                         // Trimitem nr + proprietatile fisierelor
